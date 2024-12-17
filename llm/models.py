@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from dataclasses import dataclass, field
 import datetime
@@ -10,6 +11,7 @@ import time
 from typing import (
     Any,
     AsyncGenerator,
+    Callable,
     Dict,
     Iterable,
     Iterator,
@@ -218,6 +220,7 @@ class _BaseResponse:
         self.input_tokens: Optional[int] = None
         self.output_tokens: Optional[int] = None
         self.token_details: Optional[dict] = None
+        self.done_callbacks: List[Callable] = []
 
     def set_usage(
         self,
@@ -336,6 +339,16 @@ class Response(_BaseResponse):
     model: "Model"
     conversation: Optional["Conversation"] = None
 
+    def on_done(self, callback):
+        if not self._done:
+            self.done_callbacks.append(callback)
+        else:
+            callback(self)
+
+    def _on_done(self):
+        for callback in self.done_callbacks:
+            callback(self)
+
     def __str__(self) -> str:
         return self.text()
 
@@ -372,7 +385,7 @@ class Response(_BaseResponse):
 
     def __iter__(self) -> Iterator[str]:
         self._start = time.monotonic()
-        self._start_utcnow = datetime.datetime.utcnow()
+        self._start_utcnow = datetime.datetime.now(datetime.timezone.utc)
         if self._done:
             yield from self._chunks
             return
@@ -390,6 +403,7 @@ class Response(_BaseResponse):
             self.conversation.responses.append(self)
         self._end = time.monotonic()
         self._done = True
+        self._on_done()
 
     def __repr__(self):
         text = "... not yet done ..."
@@ -402,9 +416,25 @@ class AsyncResponse(_BaseResponse):
     model: "AsyncModel"
     conversation: Optional["AsyncConversation"] = None
 
+    async def on_done(self, callback):
+        if not self._done:
+            self.done_callbacks.append(callback)
+        else:
+            if callable(callback):
+                callback = callback(self)
+            if asyncio.iscoroutine(callback):
+                await callback
+
+    async def _on_done(self):
+        for callback in self.done_callbacks:
+            if callable(callback):
+                callback = callback(self)
+            if asyncio.iscoroutine(callback):
+                await callback
+
     def __aiter__(self):
         self._start = time.monotonic()
-        self._start_utcnow = datetime.datetime.utcnow()
+        self._start_utcnow = datetime.datetime.now(datetime.timezone.utc)
         return self
 
     async def __anext__(self) -> str:
@@ -433,6 +463,7 @@ class AsyncResponse(_BaseResponse):
                 self.conversation.responses.append(self)
             self._end = time.monotonic()
             self._done = True
+            await self._on_done()
             raise
 
     async def _force(self):
