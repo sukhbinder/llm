@@ -1257,7 +1257,7 @@ order by prompt_attachments."order"
     is_flag=True,
     help="Expand fragments to show their content",
 )
-@click.option("--nth", type=int, help="List the nth entry from the last.", default=None)
+@click.option("--nth", type=int, help="List the nth entry from the last", default=None)
 def logs_list(
     count,
     path,
