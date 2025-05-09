@@ -39,6 +39,9 @@ OpenAI Chat: gpt-4o-audio-preview-2024-12-17
 OpenAI Chat: gpt-4o-audio-preview-2024-10-01
 OpenAI Chat: gpt-4o-mini-audio-preview
 OpenAI Chat: gpt-4o-mini-audio-preview-2024-12-17
+OpenAI Chat: gpt-4.1 (aliases: 4.1)
+OpenAI Chat: gpt-4.1-mini (aliases: 4.1-mini)
+OpenAI Chat: gpt-4.1-nano (aliases: 4.1-nano)
 OpenAI Chat: gpt-3.5-turbo (aliases: 3.5, chatgpt)
 OpenAI Chat: gpt-3.5-turbo-16k (aliases: chatgpt-16k, 3.5-16k)
 OpenAI Chat: gpt-4 (aliases: 4, gpt4)
@@ -54,6 +57,8 @@ OpenAI Chat: o1-2024-12-17
 OpenAI Chat: o1-preview
 OpenAI Chat: o1-mini
 OpenAI Chat: o3-mini
+OpenAI Chat: o3
+OpenAI Chat: o4-mini
 OpenAI Completion: gpt-3.5-turbo-instruct (aliases: 3.5-instruct, chatgpt-instruct)
 ```
 <!-- [[[end]]] -->
@@ -134,11 +139,14 @@ Let's say OpenAI have just released the `gpt-3.5-turbo-0613` model and you want 
 
 ```yaml
 - model_id: gpt-3.5-turbo-0613
+  model_name: gpt-3.5-turbo-0613
   aliases: ["0613"]
 ```
-The `model_id` is the identifier that will be recorded in the LLM logs. You can use this to specify the model, or you can optionally include a list of aliases for that model.
+The `model_id` is the identifier that will be recorded in the LLM logs. You can use this to specify the model, or you can optionally include a list of aliases for that model. The `model_name` is the actual model identifier that will be passed to the API, which must match exactly what the API expects.
 
 If the model is a completion model (such as `gpt-3.5-turbo-instruct`) add `completion: true` to the configuration.
+
+If the model supports structured extraction using json_schema, add `supports_schema: true` to the configuration.
 
 For reasoning models like `o1` or `o3-mini` add `reasoning: true`.
 

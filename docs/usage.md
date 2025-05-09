@@ -30,8 +30,13 @@ Or if you know the name is too long to type, use `-q` once or more to provide se
 ```bash
 llm 'Ten names for cheesecakes' -q 4o -q mini
 ```
+To change the default model for the current session, set the `LLM_MODEL` environment variable:
+```bash
+export LLM_MODEL=gpt-4.1-mini
+llm 'Ten names for cheesecakes' # Uses gpt-4.1-mini
+```
 
-You can also send a prompt to standard input, for example:
+You can send a prompt directly to standard input like this:
 ```bash
 echo 'Ten names for cheesecakes' | llm
 ```
@@ -325,6 +330,7 @@ llm chat -t cheesecake
 Chatting with gpt-4
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
+Type '!edit' to open your default editor and modify the prompt
 > who are you?
 I am a sentient cheesecake, meaning I am an artificial
 intelligence embodied in a dessert form, specifically a
@@ -345,6 +351,7 @@ If your pasted text might itself contain a `!end` line, you can set a custom del
 Chatting with gpt-4
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
+Type '!edit' to open your default editor and modify the prompt.
 > !multi custom-end
  Explain this error:
 
@@ -355,6 +362,16 @@ Type '!multi' to enter multiple lines, then '!end' to finish
 urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>
 
  !end custom-end
+```
+
+You can also use `!edit` to open your default editor and modify the prompt before sending it to the model.
+
+```
+Chatting with gpt-4
+Type 'exit' or 'quit' to exit
+Type '!multi' to enter multiple lines, then '!end' to finish
+Type '!edit' to open your default editor and modify the prompt.
+> !edit
 ```
 
 ## Listing available models
@@ -566,6 +583,66 @@ OpenAI Chat: gpt-4o-mini-audio-preview-2024-12-17
     audio/mpeg, audio/wav
   Features:
   - streaming
+  - async
+  Keys:
+    key: openai
+    env_var: OPENAI_API_KEY
+OpenAI Chat: gpt-4.1 (aliases: 4.1)
+  Options:
+    temperature: float
+    max_tokens: int
+    top_p: float
+    frequency_penalty: float
+    presence_penalty: float
+    stop: str
+    logit_bias: dict, str
+    seed: int
+    json_object: boolean
+  Attachment types:
+    application/pdf, image/gif, image/jpeg, image/png, image/webp
+  Features:
+  - streaming
+  - schemas
+  - async
+  Keys:
+    key: openai
+    env_var: OPENAI_API_KEY
+OpenAI Chat: gpt-4.1-mini (aliases: 4.1-mini)
+  Options:
+    temperature: float
+    max_tokens: int
+    top_p: float
+    frequency_penalty: float
+    presence_penalty: float
+    stop: str
+    logit_bias: dict, str
+    seed: int
+    json_object: boolean
+  Attachment types:
+    application/pdf, image/gif, image/jpeg, image/png, image/webp
+  Features:
+  - streaming
+  - schemas
+  - async
+  Keys:
+    key: openai
+    env_var: OPENAI_API_KEY
+OpenAI Chat: gpt-4.1-nano (aliases: 4.1-nano)
+  Options:
+    temperature: float
+    max_tokens: int
+    top_p: float
+    frequency_penalty: float
+    presence_penalty: float
+    stop: str
+    logit_bias: dict, str
+    seed: int
+    json_object: boolean
+  Attachment types:
+    application/pdf, image/gif, image/jpeg, image/png, image/webp
+  Features:
+  - streaming
+  - schemas
   - async
   Keys:
     key: openai
@@ -821,6 +898,44 @@ OpenAI Chat: o1-mini
     key: openai
     env_var: OPENAI_API_KEY
 OpenAI Chat: o3-mini
+  Options:
+    temperature: float
+    max_tokens: int
+    top_p: float
+    frequency_penalty: float
+    presence_penalty: float
+    stop: str
+    logit_bias: dict, str
+    seed: int
+    json_object: boolean
+    reasoning_effort: str
+  Features:
+  - streaming
+  - schemas
+  - async
+  Keys:
+    key: openai
+    env_var: OPENAI_API_KEY
+OpenAI Chat: o3
+  Options:
+    temperature: float
+    max_tokens: int
+    top_p: float
+    frequency_penalty: float
+    presence_penalty: float
+    stop: str
+    logit_bias: dict, str
+    seed: int
+    json_object: boolean
+    reasoning_effort: str
+  Features:
+  - streaming
+  - schemas
+  - async
+  Keys:
+    key: openai
+    env_var: OPENAI_API_KEY
+OpenAI Chat: o4-mini
   Options:
     temperature: float
     max_tokens: int

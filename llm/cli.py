@@ -90,13 +90,13 @@ def validate_fragment_alias(ctx, param, value):
 
 
 def resolve_fragments(
-    db: sqlite_utils.Database, fragments: Iterable[str]
-) -> List[Fragment]:
+    db: sqlite_utils.Database, fragments: Iterable[str], allow_attachments: bool = False
+) -> List[Union[Fragment, Attachment]]:
     """
-    Resolve fragments into a list of (content, source) tuples
+    Resolve fragment strings into a mixed of llm.Fragment() and llm.Attachment() objects.
     """
 
-    def _load_by_alias(fragment):
+    def _load_by_alias(fragment: str) -> Tuple[Optional[str], Optional[str]]:
         rows = list(
             db.query(
                 """
@@ -112,8 +112,8 @@ def resolve_fragments(
             return row["content"], row["source"]
         return None, None
 
-    # These can be URLs or paths or plugin references
-    resolved = []
+    # The fragment strings could be URLs or paths or plugin references
+    resolved: List[Union[Fragment, Attachment]] = []
     for fragment in fragments:
         if fragment.startswith("http://") or fragment.startswith("https://"):
             client = httpx.Client(follow_redirects=True, max_redirects=3)
@@ -132,6 +132,14 @@ def resolve_fragments(
                 result = loader(rest)
                 if not isinstance(result, list):
                     result = [result]
+                if not allow_attachments and any(
+                    isinstance(r, Attachment) for r in result
+                ):
+                    raise FragmentNotFound(
+                        "Fragment loader {} returned a disallowed attachment".format(
+                            prefix
+                        )
+                    )
                 resolved.extend(result)
             except Exception as ex:
                 raise FragmentNotFound(
@@ -293,7 +301,7 @@ def cli():
 @cli.command(name="prompt")
 @click.argument("prompt", required=False)
 @click.option("-s", "--system", help="System prompt to use")
-@click.option("model_id", "-m", "--model", help="Model to use")
+@click.option("model_id", "-m", "--model", help="Model to use", envvar="LLM_MODEL")
 @click.option(
     "-d",
     "--database",
@@ -575,8 +583,6 @@ def prompt(
     if template:
         params = dict(param)
         # Cannot be used with system
-        if system:
-            raise click.ClickException("Cannot use -t/--template and --system together")
         try:
             template_obj = load_template(template)
         except LoadTemplateError as ex:
@@ -602,13 +608,15 @@ def prompt(
         if "input" in template_obj.vars():
             input_ = read_prompt()
         try:
-            template_prompt, system = template_obj.evaluate(input_, params)
+            template_prompt, template_system = template_obj.evaluate(input_, params)
             if template_prompt:
                 # Combine with user prompt
                 if prompt and "input" not in template_obj.vars():
                     prompt = template_prompt + "\n" + prompt
                 else:
                     prompt = template_prompt
+            if template_system and not system:
+                system = template_system
         except Template.MissingVariables as ex:
             raise click.ClickException(str(ex))
         if model_id is None and template_obj.model:
@@ -630,7 +638,9 @@ def prompt(
     if conversation_id or _continue:
         # Load the conversation - loads most recent if no ID provided
         try:
-            conversation = load_conversation(conversation_id, async_=async_)
+            conversation = load_conversation(
+                conversation_id, async_=async_, database=database
+            )
         except UnknownModelError as ex:
             raise click.ClickException(str(ex))
 
@@ -668,7 +678,7 @@ def prompt(
             raise click.ClickException(render_errors(ex.errors()))
 
     # Add on any default model options
-    default_options = get_model_options(model_id)
+    default_options = get_model_options(model.model_id)
     for key_, value in default_options.items():
         if key_ not in validated_options:
             validated_options[key_] = value
@@ -688,8 +698,20 @@ def prompt(
     response = None
 
     try:
-        fragments = resolve_fragments(db, fragments)
-        system_fragments = resolve_fragments(db, system_fragments)
+        fragments_and_attachments = resolve_fragments(
+            db, fragments, allow_attachments=True
+        )
+        resolved_fragments = [
+            fragment
+            for fragment in fragments_and_attachments
+            if isinstance(fragment, Fragment)
+        ]
+        resolved_attachments.extend(
+            attachment
+            for attachment in fragments_and_attachments
+            if isinstance(attachment, Attachment)
+        )
+        resolved_system_fragments = resolve_fragments(db, system_fragments)
     except FragmentNotFound as ex:
         raise click.ClickException(str(ex))
 
@@ -707,8 +729,8 @@ def prompt(
                         attachments=resolved_attachments,
                         system=system,
                         schema=schema,
-                        fragments=fragments,
-                        system_fragments=system_fragments,
+                        fragments=resolved_fragments,
+                        system_fragments=resolved_system_fragments,
                         **kwargs,
                     )
                     async for chunk in response:
@@ -718,11 +740,11 @@ def prompt(
                 else:
                     response = prompt_method(
                         prompt,
-                        fragments=fragments,
+                        fragments=resolved_fragments,
                         attachments=resolved_attachments,
                         schema=schema,
                         system=system,
-                        system_fragments=system_fragments,
+                        system_fragments=resolved_system_fragments,
                         **kwargs,
                     )
                     text = await response.text()
@@ -737,11 +759,11 @@ def prompt(
         else:
             response = prompt_method(
                 prompt,
-                fragments=fragments,
+                fragments=resolved_fragments,
                 attachments=resolved_attachments,
                 system=system,
                 schema=schema,
-                system_fragments=system_fragments,
+                system_fragments=resolved_system_fragments,
                 **kwargs,
             )
             if should_stream:
@@ -784,7 +806,7 @@ def prompt(
 
 @cli.command()
 @click.option("-s", "--system", help="System prompt to use")
-@click.option("model_id", "-m", "--model", help="Model to use")
+@click.option("model_id", "-m", "--model", help="Model to use", envvar="LLM_MODEL")
 @click.option(
     "_continue",
     "-c",
@@ -815,6 +837,12 @@ def prompt(
     multiple=True,
     help="key/value options for the model",
 )
+@click.option(
+    "-d",
+    "--database",
+    type=click.Path(readable=True, dir_okay=False),
+    help="Path to log database",
+)
 @click.option("--no-stream", is_flag=True, help="Do not stream output")
 @click.option("--key", help="API key to use")
 def chat(
@@ -827,6 +855,7 @@ def chat(
     options,
     no_stream,
     key,
+    database,
 ):
     """
     Hold an ongoing chat with a model.
@@ -838,7 +867,7 @@ def chat(
     else:
         readline.parse_and_bind("bind -x '\\e[D: backward-char'")
         readline.parse_and_bind("bind -x '\\e[C: forward-char'")
-    log_path = logs_db_path()
+    log_path = pathlib.Path(database) if database else logs_db_path()
     (log_path.parent).mkdir(parents=True, exist_ok=True)
     db = sqlite_utils.Database(log_path)
     migrate(db)
@@ -847,16 +876,13 @@ def chat(
     if conversation_id or _continue:
         # Load the conversation - loads most recent if no ID provided
         try:
-            conversation = load_conversation(conversation_id)
+            conversation = load_conversation(conversation_id, database=database)
         except UnknownModelError as ex:
             raise click.ClickException(str(ex))
 
     template_obj = None
     if template:
         params = dict(param)
-        # Cannot be used with system
-        if system:
-            raise click.ClickException("Cannot use -t/--template and --system together")
         try:
             template_obj = load_template(template)
         except LoadTemplateError as ex:
@@ -909,6 +935,7 @@ def chat(
     click.echo("Chatting with {}".format(model.model_id))
     click.echo("Type 'exit' or 'quit' to exit")
     click.echo("Type '!multi' to enter multiple lines, then '!end' to finish")
+    click.echo("Type '!edit' to open your default editor and modify the prompt")
     in_multi = False
     accumulated = []
     end_token = "!end"
@@ -920,6 +947,15 @@ def chat(
             if len(bits) > 1:
                 end_token = "!end {}".format(" ".join(bits[1:]))
             continue
+        if prompt.strip() == "!edit":
+            edited_prompt = click.edit()
+            if edited_prompt is None:
+                click.echo("Editor closed without saving.", err=True)
+                continue
+            prompt = edited_prompt.strip()
+            if not prompt:
+                continue
+            click.echo(prompt)
         if in_multi:
             if prompt.strip() == end_token:
                 prompt = "\n".join(accumulated)
@@ -930,9 +966,16 @@ def chat(
                 continue
         if template_obj:
             try:
-                prompt, system = template_obj.evaluate(prompt, params)
+                template_prompt, template_system = template_obj.evaluate(prompt, params)
             except Template.MissingVariables as ex:
                 raise click.ClickException(str(ex))
+            if template_system and not system:
+                system = template_system
+            if template_prompt:
+                new_prompt = template_prompt
+                if prompt:
+                    new_prompt += "\n" + prompt
+                prompt = new_prompt
         if prompt.strip() in ("exit", "quit"):
             break
         response = conversation.prompt(prompt, system=system, **kwargs)
@@ -946,9 +989,12 @@ def chat(
 
 
 def load_conversation(
-    conversation_id: Optional[str], async_=False
+    conversation_id: Optional[str],
+    async_=False,
+    database=None,
 ) -> Optional[_BaseConversation]:
-    db = sqlite_utils.Database(logs_db_path())
+    log_path = pathlib.Path(database) if database else logs_db_path()
+    db = sqlite_utils.Database(log_path)
     migrate(db)
     if conversation_id is None:
         # Return the most recent conversation, or None if there are none
@@ -2197,7 +2243,8 @@ def fragments_list(queries, aliases, json_):
         fragment_aliases on fragment_aliases.fragment_id = fragments.id
     {where}
     group by
-        fragments.id, fragments.hash, fragments.content, fragments.datetime_utc, fragments.source;
+        fragments.id, fragments.hash, fragments.content, fragments.datetime_utc, fragments.source
+    order by fragments.datetime_utc
     """.format(
         where=where
     )
@@ -2287,6 +2334,26 @@ def fragments_remove(alias):
         )
 
 
+@fragments.command(name="loaders")
+def fragments_loaders():
+    """Show fragment loaders registered by plugins"""
+    from llm import get_fragment_loaders
+
+    found = False
+    for prefix, loader in get_fragment_loaders().items():
+        if found:
+            # Extra newline on all after the first
+            click.echo("")
+        found = True
+        docs = "Undocumented"
+        if loader.__doc__:
+            docs = textwrap.dedent(loader.__doc__).strip()
+        click.echo(f"{prefix}:")
+        click.echo(textwrap.indent(docs, "  "))
+    if not found:
+        click.echo("No fragment loaders found")
+
+
 @cli.command(name="plugins")
 @click.option("--all", help="Include built-in default plugins", is_flag=True)
 def plugins_list(all):
@@ -2356,7 +2423,9 @@ def uninstall(packages, yes):
     type=click.Path(exists=True, readable=True, allow_dash=True),
     help="File to embed",
 )
-@click.option("-m", "--model", help="Embedding model to use")
+@click.option(
+    "-m", "--model", help="Embedding model to use", envvar="LLM_EMBEDDING_MODEL"
+)
 @click.option("--store", is_flag=True, help="Store the text itself in the database")
 @click.option(
     "-d",
@@ -2498,7 +2567,9 @@ def embed(
     "--batch-size", type=int, help="Batch size to use when running embeddings"
 )
 @click.option("--prefix", help="Prefix to add to the IDs", default="")
-@click.option("-m", "--model", help="Embedding model to use")
+@click.option(
+    "-m", "--model", help="Embedding model to use", envvar="LLM_EMBEDDING_MODEL"
+)
 @click.option(
     "--prepend",
     help="Prepend this string to all content before embedding",

@@ -85,10 +85,26 @@ class MockModel(llm.Model):
 class EchoModel(llm.Model):
     model_id = "echo"
     can_stream = True
+    attachment_types = {"image/png"}
+
+    class Options(llm.Options):
+        example_int: Optional[int] = Field(
+            description="Example integer option", default=None
+        )
 
     def execute(self, prompt, stream, response, conversation):
         yield "system:\n{}\n\n".format(prompt.system or "")
         yield "prompt:\n{}".format(prompt.prompt or "")
+        # Only show non-null options
+        non_null_options = {
+            k: v for k, v in prompt.options.model_dump().items() if v is not None
+        }
+        if non_null_options:
+            yield "\n\noptions: {}".format(json.dumps(non_null_options))
+        if prompt.attachments:
+            yield "\n\nattachments:\n"
+            for attachment in prompt.attachments:
+                yield f"  - {attachment.url}\n"
 
 
 class MockKeyModel(llm.KeyModel):

@@ -1,5 +1,27 @@
 # Changelog
 
+(v0_25)=
+## 0.25 (2025-05-04)
+
+- New plugin feature: {ref}`plugin-hooks-register-fragment-loaders` plugins can now return a mixture of fragments and attachments. The [llm-video-frames](https://github.com/simonw/llm-video-frames) plugin is the first to take advantage of this mechanism. [#972](https://github.com/simonw/llm/issues/972)
+- New OpenAI models: `gpt-4.1`, `gpt-4.1-mini`, `gpt-41-nano`, `o3`, `o4-mini`. [#945](https://github.com/simonw/llm/issues/945), [#965](https://github.com/simonw/llm/issues/965), [#976](https://github.com/simonw/llm/issues/976).
+- New environment variables: `LLM_MODEL` and `LLM_EMBEDDING_MODEL` for setting the model to use without needing to specify `-m model_id` every time. [#932](https://github.com/simonw/llm/issues/932)
+- New command: `llm fragments loaders`, to list all currently available fragment loader prefixes provided by plugins. [#941](https://github.com/simonw/llm/issues/941)
+- `llm fragments` command now shows fragments ordered by the date they were first used. [#973](https://github.com/simonw/llm/issues/973)
+- `llm chat` now includes a `!edit` command for editing a prompt using your default terminal text editor. Thanks, [Benedikt Willi](https://github.com/Hopiu). [#969](https://github.com/simonw/llm/pull/969)
+- Allow `-t` and `--system` to be used at the same time. [#916](https://github.com/simonw/llm/issues/916)
+- Fixed a bug where accessing a model via its alias would fail to respect any default options set for that model. [#968](https://github.com/simonw/llm/issues/968)
+- Improved documentation for {ref}`extra-openai-models.yaml <openai-compatible-models>`. Thanks, [Rahim Nathwani](https://github.com/rahimnathwani) and [Dan Guido](https://github.com/dguido). [#950](https://github.com/simonw/llm/pull/950), [#957](https://github.com/simonw/llm/pull/957)
+- `llm -c/--continue` now works correctly with the `-d/--database` option. `llm chat` now accepts that `-d/--database` option. Thanks, [Sukhbinder Singh](https://github.com/sukhbinder). [#933](https://github.com/simonw/llm/issues/933)
+
+(v0_25a0)=
+## 0.25a0 (2025-04-10)
+
+- `llm models --options` now shows keys and environment variables for models that use API keys. Thanks, [Steve Morin](https://github.com/smorin). [#903](https://github.com/simonw/llm/issues/903)
+- Added `py.typed` marker file so LLM can now be used as a dependency in projects that use `mypy` without a warning. [#887](https://github.com/simonw/llm/issues/887)
+- `$` characters can now be used in templates by escaping them as `$$`. Thanks, [@guspix](https://github.com/guspix). [#904](https://github.com/simonw/llm/issues/904)
+- LLM now uses `pyproject.toml` instead of `setup.py`. [#908](https://github.com/simonw/llm/issues/908)
+
 (v0_24_2)=
 ## 0.24.2 (2025-04-08)
 
@@ -411,6 +433,7 @@ This starts a chat session:
 ```
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
+Type '!edit' to open your default editor and modify the prompt.
 > Who are you?
 Hello! I'm just an AI, here to assist you with any questions you may have.
 My name is LLaMA, and I'm a large language model trained to provide helpful

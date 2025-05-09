@@ -162,6 +162,7 @@ Options:
   -t, --template TEXT          Template to use
   -p, --param <TEXT TEXT>...   Parameters for template
   -o, --option <TEXT TEXT>...  key/value options for the model
+  -d, --database FILE          Path to log database
   --no-stream                  Do not stream output
   --key TEXT                   API key to use
   --help                       Show this message and exit.
@@ -689,10 +690,11 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  list*   List current fragments
-  remove  Remove a fragment alias
-  set     Set an alias for a fragment
-  show    Display the fragment stored under an alias or hash
+  list*    List current fragments
+  loaders  Show fragment loaders registered by plugins
+  remove   Remove a fragment alias
+  set      Set an alias for a fragment
+  show     Display the fragment stored under an alias or hash
 ```
 
 (help-fragments-list)=
@@ -749,6 +751,17 @@ Usage: llm fragments remove [OPTIONS] ALIAS
   Example usage:
 
       llm fragments remove docs
+
+Options:
+  --help  Show this message and exit.
+```
+
+(help-fragments-loaders)=
+#### llm fragments loaders --help
+```
+Usage: llm fragments loaders [OPTIONS]
+
+  Show fragment loaders registered by plugins
 
 Options:
   --help  Show this message and exit.
