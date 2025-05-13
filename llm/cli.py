@@ -264,15 +264,16 @@ def schema_option(fn):
     )(fn)
     return fn
 
+
 # Shared mixin to add `-h` support
 class HelpMixin:
     def get_help_option(self, ctx):
         return click.Option(
-            ['-h', '--help'],
+            ["-h", "--help"],
             is_flag=True,
             expose_value=False,
             is_eager=True,
-            help='Show this message and exit.',
+            help="Show this message and exit.",
             callback=self._help_callback,
         )
 
@@ -282,13 +283,16 @@ class HelpMixin:
         click.echo(ctx.get_help())
         ctx.exit()
 
+
 # Subclass DefaultGroup with help mixin
 class HelpDefaultGroup(HelpMixin, DefaultGroup):
     pass
 
+
 # Subclass Command with help mixin
 class HelpCommand(HelpMixin, click.Command):
     pass
+
 
 @click.group(
     cls=HelpDefaultGroup,
